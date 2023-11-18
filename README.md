@@ -1,11 +1,11 @@
 # Multimodal-Analytics-and-Text-Modeling
 An integrated project showcasing image processing, histogram equalization, LDA topic modeling, and review analysis using Python's data science libraries
 
-#Multimodal Analytics and Text Modeling
+Multimodal Analytics and Text Modeling
 #Overview
 This project demonstrates multimodal analytics involving image processing, histogram equalization, and text analysis using Python's data science libraries. It showcases techniques like image resizing, grayscale conversion, histogram visualization, and Latent Dirichlet Allocation (LDA) topic modeling for textual data.
 
-#How to Run
+**How to Run**
 To replicate the results, follow these steps:
 
 Install necessary libraries (e.g., numpy, pandas, scikit-learn, matplotlib, PIL, spacy).
