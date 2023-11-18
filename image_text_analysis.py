@@ -1,59 +1,63 @@
-# Import libraries
-import matplotlib.pyplot as plt
-import numpy as np
-from PIL import Image
-import pandas as pd
-import openpyxl
+# Import necessary libraries
+import matplotlib.pyplot as plt  # Library for plotting
+import numpy as np  # Library for numerical operations
+from PIL import Image  # Library to handle images
+import pandas as pd  # Library to work with data in Excel files
+import openpyxl  # Library to handle Excel files
 
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.decomposition import LatentDirichletAllocation
-from collections import defaultdict
-import spacy
+from sklearn.feature_extraction.text import CountVectorizer  # For text vectorization
+from sklearn.decomposition import LatentDirichletAllocation  # For LDA modeling
+from collections import defaultdict  # For a dictionary with default values
+import spacy  # Library for NLP tasks
 
-# Check if model is installed
+# Check if the spaCy model is installed
 if 'en_core_web_sm' not in spacy.cli.info()['pipelines']:
-    # Download model
+    # If not installed, download the model
     spacy.cli.download('en_core_web_sm')
 
-# Load model
+# Load the 'en_core_web_sm' model from spaCy
 nlp = spacy.load('en_core_web_sm')
 
 # Part 1 - Image Representation
 
-images = []
+# Store flattened image arrays
+imageArrays = []
+
 # Part 1 Step 1 - Read images and resize
+# Loop through each image from 1 to 10
 for i in range(1, 11):
-    # Load image
-    im = Image.open(str(i) + '.PNG')
+    # Load the image
+    image = Image.open(str(i) + '.PNG')
 
-    # Resize image
-    im_rs = im.resize((100, 100))
+    # Resize the image to 100x100 pixels
+    resizedImage = image.resize((100, 100))
 
-    # Convert to numpy array
-    im_m = np.array(im_rs)
+    # Convert the image to a numpy array
+    imageArray = np.array(resizedImage)
 
     # Part 1 Step 2 - Convert to grayscale
-    im_grey_m = np.array(im_rs.convert('L'))
+    grayscaleImageArray = np.array(resizedImage.convert('L'))
 
     # Part 1 Step 3 - Flatten and plot histograms
-    im_v = im_grey_m.flatten()
+    # Flatten the grayscale image array and store it
+    flattenedImageArray = grayscaleImageArray.flatten()
+    imageArrays.append(flattenedImageArray)
 
-    images.append(im_v)
-
-    # Plot histogram
-    plt.hist(im_v, bins=100)
+    # Plot the histogram for the image
+    plt.hist(flattenedImageArray, bins=100)
     plt.title("Histogram for Image {}".format(i))
     plt.savefig("hist_" + str(i) + ".png")
     plt.close()
 
     # Part 1 Step 4 - Equalize histograms
-    imhist, bins = np.histogram(im_v, 256, density=True)
-    cdf = imhist.cumsum()
+    # Equalize the histogram of the image
+    imageHistogram, bins = np.histogram(flattenedImageArray, 256, density=True)
+    cdf = imageHistogram.cumsum()
     cdf = 255 * cdf / cdf[-1]
-    im2 = np.interp(im_v, bins[:-1], cdf)
+    equalizedImageArray = np.interp(flattenedImageArray, bins[:-1], cdf)
 
-    # Plot equalized histogram
-    plt.hist(im2, bins=100)
+    # Plot the equalized histogram for the image
+    plt.hist(equalizedImageArray, bins=100)
     plt.title("Equalized Histogram for Image {}".format(i))
     plt.savefig("hist_eq_" + str(i) + ".png")
     plt.close()
@@ -63,56 +67,55 @@ import csv
 
 with open('images.csv', 'w', newline='') as file:
     writer = csv.writer(file)
-    writer.writerows(images)
+    writer.writerows(imageArrays)
 
 # Part 1 Step 5 - Compare histograms (Histogram differences)
-print(
-    "The equalized histograms are more evenly distributed compared to the original histograms which are concentrated around certain intensity values. Equalization helps stretch contrast and bring out details.")
+print("The equalized histograms show a better balance in intensity, bringing out more details and enhancing contrast in the images")
 
 # Part 2 - Topic Modeling
+# Load data from Excel file
+dataFrame = pd.read_excel('Assignment2text.xlsx')
 
-# Load data
-df = pd.read_excel('Assignment2text.xlsx')
-
-# Preprocess text
-nlp = spacy.load('en_core_web_sm')
-docs = []
-for review in df['review']:
+# Preprocess text using spacy
+processedDocs = []
+for review in dataFrame['review']:
+    # Tokenize and lemmatize each word in the review if it's not a stopword or punctuation
     doc = nlp(review)
     tokens = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]
-    docs.append(' '.join(tokens))
+    # Join the tokens back into a single string and append it to the processedDocs list
+    processedDocs.append(' '.join(tokens))
 
 # Part 2 Step 1 - Vectorize documents
-vectorizer = CountVectorizer(min_df=5, ngram_range=(1, 2))
-X = vectorizer.fit_transform(docs)
+documentVectorizer = CountVectorizer(min_df=5, ngram_range=(1, 2))
+# Convert the processed text into a matrix of token counts
+vectorizedDocuments = documentVectorizer.fit_transform(processedDocs)
 
 # Part 2 Step 2 - Apply LDA
-lda = LatentDirichletAllocation(n_components=6)
-lda.fit(X)
+ldaModel = LatentDirichletAllocation(n_components=6)
+# Fit the LDA model to the vectorized documents
+ldaModel.fit(vectorizedDocuments)
 
 # Part 2 Step 3 - Get topic distributions
-restaurant_topics = lda.transform(vectorizer.transform(docs[:10]))
-movie_topics = lda.transform(vectorizer.transform(docs[500:510]))
+# Transform the first 10 and 501-510 documents to their topic distributions using LDA
+restaurantTopics = ldaModel.transform(documentVectorizer.transform(processedDocs[:10]))
+movieTopics = ldaModel.transform(documentVectorizer.transform(processedDocs[500:510]))
 
-# Previous code
+# Part 2 Step 4 - Get top terms for each topic
+topicTerms = defaultdict(list)
+featureNames = documentVectorizer.get_feature_names_out()  # Get feature names
 
-# Part 2 Step 4 - Get top terms
-topic_terms = defaultdict(list)
-feature_names = vectorizer.get_feature_names_out() # Use correct method name
-
-for i, topic in enumerate(lda.components_):
-  top_indices = topic.argsort()[-5:]
-  top_terms = [feature_names[index] for index in top_indices]
-  topic_terms[i] = top_terms
-
-# Rest of code
+# For each topic, get the top 5 terms based on their weights in the LDA model
+for i, topic in enumerate(ldaModel.components_):
+    topIndices = topic.argsort()[-5:]
+    topTerms = [featureNames[index] for index in topIndices]
+    topicTerms[i] = topTerms
 
 # Print results
-print("Restaurant review 1 focuses on topics:", restaurant_topics[0].argmax())
-print("Movie review 501 focuses on topics:", movie_topics[0].argmax())
+print("Restaurant review 1 focuses on topics:", restaurantTopics[0].argmax())
+print("Movie review 501 focuses on topics:", movieTopics[0].argmax())
 
 print("Top terms for each topic:")
-for i, terms in topic_terms.items():
+for i, terms in topicTerms.items():
     print("Topic {}: {}".format(i, terms))
 
 # Part 2 Step 5 - Describe example reviews
